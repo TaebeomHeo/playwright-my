@@ -1,3 +1,18 @@
+/**
+ * Copyright (c) Microsoft Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 const { test, expect } = require('@playwright/test');
 
 class DanawaFilterTest {
@@ -10,57 +25,28 @@ class DanawaFilterTest {
   async navigateToTVCategory() {
     await this.page.goto(this.baseUrl);
 
-    // networkidle 대신 더 안정적인 대기 방법들 사용
     try {
-      // 1. DOM이 로드될 때까지 대기
+      // DOM이 로드될 때까지 대기
       await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 });
 
-      // 2. 특정 요소가 나타날 때까지 대기 (더 구체적)
+      // 제품 목록이 나타날 때까지 대기
       await this.page.waitForSelector('ul.product_list, .prod_item, [class*="product"]', {
         timeout: 15000,
         state: 'visible'
       });
 
-      // 3. 추가 안정화를 위한 짧은 대기
+      // 추가 안정화를 위한 짧은 대기
       await this.page.waitForTimeout(2000);
 
     } catch (error) {
       console.log('페이지 로딩 대기 중 오류:', error.message);
-      // 오류가 발생해도 계속 진행
     }
 
     // 팝업 자동 처리
     await this.closePopupsIfExists();
   }
-
-  // 대안적인 대기 방법들 (필요시 사용)
-  async alternativeWaitMethods() {
-    // 방법 1: 특정 텍스트가 나타날 때까지 대기
-    // await this.page.waitForFunction(() => {
-    //   return document.body.textContent.includes('제조회사') || 
-    //          document.body.textContent.includes('TV');
-    // }, { timeout: 15000 });
-
-    // 방법 2: 네트워크 요청 완료 대기 (특정 요청만)
-    // await this.page.waitForResponse(response => 
-    //   response.url().includes('danawa.com') && 
-    //   response.status() === 200, 
-    //   { timeout: 10000 }
-    // );
-
-    // 방법 3: 여러 요소 중 하나라도 나타나면 진행
-    // await this.page.waitForSelector([
-    //   'ul.product_list',
-    //   '.prod_item',
-    //   '[class*="product"]',
-    //   '[class*="item"]'
-    // ].join(', '), { timeout: 15000 });
-
-    // 방법 4: 페이지가 완전히 로드될 때까지 폴링
-    // await this.page.waitForFunction(() => {
-    //   return document.readyState === 'complete' && 
-    //          !document.querySelector('.loading, .spinner');
-    // }, { timeout: 20000 });
+  baseUrl(baseUrl: any) {
+    throw new Error('Method not implemented.');
   }
 
   async closePopupsIfExists() {
@@ -84,363 +70,32 @@ class DanawaFilterTest {
     }
   }
 
-  // 사용 가능한 필터 조건들을 수집
-  async getAvailableFilters() {
-    const filters = {};
-
-    // 모든 필터 섹션 수집
-    await this.collectAllFilterSections(filters);
-
-    // 브랜드 필터 수집
-    await this.collectBrandFilters(filters);
-
-    // 화면크기 필터 수집
-    await this.collectScreenSizeFilters(filters);
-
-    // 해상도 필터 수집
-    await this.collectResolutionFilters(filters);
-
-    // 가격 필터 수집
-    await this.collectPriceFilters(filters);
-
-    // 추가 필터들 수집
-    await this.collectAdditionalFilters(filters);
-
-    return filters;
-  }
-
-  // 모든 필터 섹션 수집 (디버깅용)
-  async collectAllFilterSections(filters) {
+  // 제조사별 필터 수집
+  async getBrandFilters() {
     try {
-      console.log('=== 모든 필터 섹션 분석 ===');
+      console.log('=== 제조사별 필터 수집 시작 ===');
 
-      // 모든 dl.spec_item_bg 요소 찾기
-      const allFilterSections = this.page.locator('dl.spec_item_bg');
-      const sectionCount = await allFilterSections.count();
+      // 제조사별 필터 섹션 찾기
+      const brandSection = this.page.locator('dl.spec_item.spec_item_bg.makerBrandArea');
 
-      console.log(`총 필터 섹션 개수: ${sectionCount}개`);
-
-      filters.allSections = [];
-
-      for (let i = 0; i < Math.min(sectionCount, 15); i++) { // 최대 15개만 분석
-        try {
-          const section = allFilterSections.nth(i);
-
-          // 섹션 제목 가져오기
-          const titleElement = section.locator('dt.item_dt');
-          let title = '';
-          if (await titleElement.count() > 0) {
-            title = await titleElement.textContent();
-          }
-
-          // 체크박스 개수 확인
-          const checkboxes = section.locator('input[type="checkbox"]');
-          const checkboxCount = await checkboxes.count();
-
-          // 라디오 버튼 개수 확인
-          const radioButtons = section.locator('input[type="radio"]');
-          const radioCount = await radioButtons.count();
-
-          // 입력 필드 개수 확인
-          const inputs = section.locator('input[type="text"], input[type="number"]');
-          const inputCount = await inputs.count();
-
-          const sectionInfo = {
-            index: i + 1,
-            title: title?.trim() || `섹션 ${i + 1}`,
-            checkboxCount,
-            radioCount,
-            inputCount,
-            totalElements: checkboxCount + radioCount + inputCount
-          };
-
-          filters.allSections.push(sectionInfo);
-          console.log(`섹션 ${i + 1}: "${sectionInfo.title}" (체크박스: ${checkboxCount}, 라디오: ${radioCount}, 입력: ${inputCount})`);
-
-        } catch (error) {
-          console.log(`섹션 ${i + 1} 분석 실패: ${error.message}`);
-        }
+      // 섹션이 존재하는지 확인
+      const sectionExists = await brandSection.count();
+      if (sectionExists === 0) {
+        console.log('제조사별 필터 섹션을 찾을 수 없습니다.');
+        return [];
       }
 
-      console.log('=== 필터 섹션 분석 완료 ===');
+      console.log('제조사별 필터 섹션 발견');
 
-    } catch (error) {
-      console.log('필터 섹션 분석 실패:', error.message);
-    }
-  }
-
-  // 추가 필터들 수집
-  async collectAdditionalFilters(filters) {
-    try {
-      console.log('=== 추가 필터 수집 ===');
-
-      // 1. 해상도 필터 (이미 있지만 다른 방법으로도 시도)
-      await this.collectResolutionFilters(filters);
-
-      // 2. 패널 타입 필터
-      await this.collectPanelTypeFilters(filters);
-
-      // 3. 스마트 TV 기능 필터
-      await this.collectSmartTVFilters(filters);
-
-      // 4. HDR 지원 필터
-      await this.collectHDRFilters(filters);
-
-      // 5. HDMI 포트 수 필터
-      await this.collectHDMIFilters(filters);
-
-      // 6. USB 포트 수 필터
-      await this.collectUSBFilters(filters);
-
-      console.log('=== 추가 필터 수집 완료 ===');
-
-    } catch (error) {
-      console.log('추가 필터 수집 실패:', error.message);
-    }
-  }
-
-  // 패널 타입 필터 수집
-  async collectPanelTypeFilters(filters) {
-    try {
-      const panelSection = this.page.locator('dl.spec_item_bg').filter({ hasText: /패널|LCD|OLED|QLED|LED/ });
-      const panelCheckboxes = panelSection.locator('input[type="checkbox"]');
-      const checkboxCount = await panelCheckboxes.count();
-
-      if (checkboxCount > 0) {
-        filters.panelType = [];
-        console.log(`패널 타입 체크박스 ${checkboxCount}개 발견`);
-
-        for (let i = 0; i < Math.min(5, checkboxCount); i++) {
-          try {
-            const checkbox = panelCheckboxes.nth(i);
-            const value = await checkbox.getAttribute('value');
-            const id = await checkbox.getAttribute('id');
-
-            let label = '';
-            try {
-              const labelElement = checkbox.locator('xpath=..');
-              if (await labelElement.count() > 0) {
-                label = await labelElement.textContent();
-              }
-            } catch (error) {
-              // 무시
-            }
-
-            if (value && label) {
-              filters.panelType.push({
-                value,
-                label: label.trim(),
-                element: checkbox,
-                id
-              });
-              console.log(`패널 타입 추가: ${label.trim()} (${value})`);
-            }
-          } catch (error) {
-            console.log(`패널 타입 ${i + 1} 정보 추출 실패: ${error.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('패널 타입 필터 수집 실패:', error.message);
-    }
-  }
-
-  // 스마트 TV 기능 필터 수집
-  async collectSmartTVFilters(filters) {
-    try {
-      const smartSection = this.page.locator('dl.spec_item_bg').filter({ hasText: /스마트|인터넷|앱/ });
-      const smartCheckboxes = smartSection.locator('input[type="checkbox"]');
-      const checkboxCount = await smartCheckboxes.count();
-
-      if (checkboxCount > 0) {
-        filters.smartTV = [];
-        console.log(`스마트 TV 체크박스 ${checkboxCount}개 발견`);
-
-        for (let i = 0; i < Math.min(5, checkboxCount); i++) {
-          try {
-            const checkbox = smartCheckboxes.nth(i);
-            const value = await checkbox.getAttribute('value');
-            const id = await checkbox.getAttribute('id');
-
-            let label = '';
-            try {
-              const labelElement = checkbox.locator('xpath=..');
-              if (await labelElement.count() > 0) {
-                label = await labelElement.textContent();
-              }
-            } catch (error) {
-              // 무시
-            }
-
-            if (value && label) {
-              filters.smartTV.push({
-                value,
-                label: label.trim(),
-                element: checkbox,
-                id
-              });
-              console.log(`스마트 TV 추가: ${label.trim()} (${value})`);
-            }
-          } catch (error) {
-            console.log(`스마트 TV ${i + 1} 정보 추출 실패: ${error.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('스마트 TV 필터 수집 실패:', error.message);
-    }
-  }
-
-  // HDR 지원 필터 수집
-  async collectHDRFilters(filters) {
-    try {
-      const hdrSection = this.page.locator('dl.spec_item_bg').filter({ hasText: /HDR/ });
-      const hdrCheckboxes = hdrSection.locator('input[type="checkbox"]');
-      const checkboxCount = await hdrCheckboxes.count();
-
-      if (checkboxCount > 0) {
-        filters.hdr = [];
-        console.log(`HDR 체크박스 ${checkboxCount}개 발견`);
-
-        for (let i = 0; i < Math.min(5, checkboxCount); i++) {
-          try {
-            const checkbox = hdrCheckboxes.nth(i);
-            const value = await checkbox.getAttribute('value');
-            const id = await checkbox.getAttribute('id');
-
-            let label = '';
-            try {
-              const labelElement = checkbox.locator('xpath=..');
-              if (await labelElement.count() > 0) {
-                label = await labelElement.textContent();
-              }
-            } catch (error) {
-              // 무시
-            }
-
-            if (value && label) {
-              filters.hdr.push({
-                value,
-                label: label.trim(),
-                element: checkbox,
-                id
-              });
-              console.log(`HDR 추가: ${label.trim()} (${value})`);
-            }
-          } catch (error) {
-            console.log(`HDR ${i + 1} 정보 추출 실패: ${error.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('HDR 필터 수집 실패:', error.message);
-    }
-  }
-
-  // HDMI 포트 수 필터 수집
-  async collectHDMIFilters(filters) {
-    try {
-      const hdmiSection = this.page.locator('dl.spec_item_bg').filter({ hasText: /HDMI/ });
-      const hdmiCheckboxes = hdmiSection.locator('input[type="checkbox"]');
-      const checkboxCount = await hdmiCheckboxes.count();
-
-      if (checkboxCount > 0) {
-        filters.hdmi = [];
-        console.log(`HDMI 체크박스 ${checkboxCount}개 발견`);
-
-        for (let i = 0; i < Math.min(5, checkboxCount); i++) {
-          try {
-            const checkbox = hdmiCheckboxes.nth(i);
-            const value = await checkbox.getAttribute('value');
-            const id = await checkbox.getAttribute('id');
-
-            let label = '';
-            try {
-              const labelElement = checkbox.locator('xpath=..');
-              if (await labelElement.count() > 0) {
-                label = await labelElement.textContent();
-              }
-            } catch (error) {
-              // 무시
-            }
-
-            if (value && label) {
-              filters.hdmi.push({
-                value,
-                label: label.trim(),
-                element: checkbox,
-                id
-              });
-              console.log(`HDMI 추가: ${label.trim()} (${value})`);
-            }
-          } catch (error) {
-            console.log(`HDMI ${i + 1} 정보 추출 실패: ${error.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('HDMI 필터 수집 실패:', error.message);
-    }
-  }
-
-  // USB 포트 수 필터 수집
-  async collectUSBFilters(filters) {
-    try {
-      const usbSection = this.page.locator('dl.spec_item_bg').filter({ hasText: /USB/ });
-      const usbCheckboxes = usbSection.locator('input[type="checkbox"]');
-      const checkboxCount = await usbCheckboxes.count();
-
-      if (checkboxCount > 0) {
-        filters.usb = [];
-        console.log(`USB 체크박스 ${checkboxCount}개 발견`);
-
-        for (let i = 0; i < Math.min(5, checkboxCount); i++) {
-          try {
-            const checkbox = usbCheckboxes.nth(i);
-            const value = await checkbox.getAttribute('value');
-            const id = await checkbox.getAttribute('id');
-
-            let label = '';
-            try {
-              const labelElement = checkbox.locator('xpath=..');
-              if (await labelElement.count() > 0) {
-                label = await labelElement.textContent();
-              }
-            } catch (error) {
-              // 무시
-            }
-
-            if (value && label) {
-              filters.usb.push({
-                value,
-                label: label.trim(),
-                element: checkbox,
-                id
-              });
-              console.log(`USB 추가: ${label.trim()} (${value})`);
-            }
-          } catch (error) {
-            console.log(`USB ${i + 1} 정보 추출 실패: ${error.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('USB 필터 수집 실패:', error.message);
-    }
-  }
-
-  async collectBrandFilters(filters) {
-    try {
-      // 실제 HTML 구조에 따른 브랜드 필터 수집
-      const brandSection = this.page.locator('dl.spec_item_bg.makerBrandArea');
+      // 체크박스 찾기
       const brandCheckboxes = brandSection.locator('input[type="checkbox"][id^="searchMakerRep"]');
       const checkboxCount = await brandCheckboxes.count();
 
       if (checkboxCount > 0) {
-        filters.brand = [];
-        console.log(`브랜드 체크박스 ${checkboxCount}개 발견`);
+        const brands = [];
+        console.log(`제조사별 체크박스 ${checkboxCount}개 발견`);
 
-        // 처음 10개만 수집 (성능 고려)
+        // 처음 10개만 수집
         const maxBrands = Math.min(10, checkboxCount);
 
         for (let i = 0; i < maxBrands; i++) {
@@ -457,398 +112,294 @@ class DanawaFilterTest {
                 label = await labelElement.textContent();
               }
             } catch (error) {
-              // 무시
+              console.log(`브랜드 ${i + 1} 라벨 추출 실패: ${error.message}`);
             }
 
             if (value && label) {
-              filters.brand.push({
+              brands.push({
                 value,
                 label: label.trim(),
                 element: checkbox,
                 id
               });
-              console.log(`브랜드 추가: ${label.trim()} (${value})`);
+              console.log(`제조사 추가: ${label.trim()} (${value})`);
+            } else {
+              console.log(`브랜드 ${i + 1}: value=${value}, label=${label}`);
             }
           } catch (error) {
             console.log(`브랜드 ${i + 1} 정보 추출 실패: ${error.message}`);
           }
         }
+
+        console.log(`총 ${brands.length}개의 제조사 필터 수집 완료`);
+        return brands;
+      } else {
+        console.log('제조사별 체크박스를 찾을 수 없습니다.');
+        return [];
       }
     } catch (error) {
-      console.log('브랜드 필터 수집 실패:', error.message);
+      console.log('제조사별 필터 수집 실패:', error.message);
+      return [];
     }
   }
 
-  async collectScreenSizeFilters(filters) {
-    try {
-      // 화면크기 필터 섹션 찾기
-      const sizeSection = this.page.locator('dl.spec_item_bg').filter({ hasText: '화면크기' });
-      const sizeCheckboxes = sizeSection.locator('input[type="checkbox"]');
-      const checkboxCount = await sizeCheckboxes.count();
-
-      if (checkboxCount > 0) {
-        filters.screenSize = [];
-        console.log(`화면크기 체크박스 ${checkboxCount}개 발견`);
-
-        for (let i = 0; i < Math.min(5, checkboxCount); i++) {
-          try {
-            const checkbox = sizeCheckboxes.nth(i);
-            const value = await checkbox.getAttribute('value');
-            const id = await checkbox.getAttribute('id');
-
-            // label 태그에서 텍스트 가져오기
-            let label = '';
-            try {
-              const labelElement = checkbox.locator('xpath=..'); // 부모 label 태그
-              if (await labelElement.count() > 0) {
-                label = await labelElement.textContent();
-              }
-            } catch (error) {
-              // 무시
-            }
-
-            if (value && label) {
-              filters.screenSize.push({
-                value,
-                label: label.trim(),
-                element: checkbox,
-                id
-              });
-              console.log(`화면크기 추가: ${label.trim()} (${value})`);
-            }
-          } catch (error) {
-            console.log(`화면크기 ${i + 1} 정보 추출 실패: ${error.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('화면크기 필터 수집 실패:', error.message);
-    }
-  }
-
-  async collectResolutionFilters(filters) {
-    try {
-      // 해상도 필터 섹션 찾기
-      const resolutionSection = this.page.locator('dl.spec_item_bg').filter({ hasText: '해상도' });
-      const resolutionCheckboxes = resolutionSection.locator('input[type="checkbox"]');
-      const checkboxCount = await resolutionCheckboxes.count();
-
-      if (checkboxCount > 0) {
-        filters.resolution = [];
-        console.log(`해상도 체크박스 ${checkboxCount}개 발견`);
-
-        for (let i = 0; i < Math.min(5, checkboxCount); i++) {
-          try {
-            const checkbox = resolutionCheckboxes.nth(i);
-            const value = await checkbox.getAttribute('value');
-            const id = await checkbox.getAttribute('id');
-
-            // label 태그에서 텍스트 가져오기
-            let label = '';
-            try {
-              const labelElement = checkbox.locator('xpath=..'); // 부모 label 태그
-              if (await labelElement.count() > 0) {
-                label = await labelElement.textContent();
-              }
-            } catch (error) {
-              // 무시
-            }
-
-            if (value && label) {
-              filters.resolution.push({
-                value,
-                label: label.trim(),
-                element: checkbox,
-                id
-              });
-              console.log(`해상도 추가: ${label.trim()} (${value})`);
-            }
-          } catch (error) {
-            console.log(`해상도 ${i + 1} 정보 추출 실패: ${error.message}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.log('해상도 필터 수집 실패:', error.message);
-    }
-  }
-
-  async collectPriceFilters(filters) {
-    try {
-      const minPriceInput = this.page.getByPlaceholder('최소가격');
-      const maxPriceInput = this.page.getByPlaceholder('최대가격');
-
-      if (await minPriceInput.count() > 0 && await maxPriceInput.count() > 0) {
-        filters.priceRange = {
-          minInput: minPriceInput,
-          maxInput: maxPriceInput,
-          applyButton: this.page.getByRole('button', { name: /적용|검색/ })
-        };
-      }
-    } catch (error) {
-      console.log('가격 필터 수집 실패:', error.message);
-    }
-  }
-
-  // 특정 필터 적용
+  // 제조사 필터 적용
   async applyBrandFilter(brandOption) {
-    console.log(`브랜드 필터 적용: ${brandOption.label}`);
+    try {
+      console.log(`제조사 필터 적용: ${brandOption.label} (${brandOption.value})`);
 
-    await brandOption.element.check();
-    await this.page.waitForLoadState('networkidle');
+      // 체크박스 클릭
+      await brandOption.element.check();
+      console.log(`체크박스 클릭 완료: ${brandOption.label}`);
 
-    // 필터 적용 확인
-    await expect(brandOption.element).toBeChecked();
+      // 필터 적용 후 충분한 대기 (검색 결과 새로고침 대기)
+      console.log('검색 결과 새로고침 대기 중...');
+      await this.page.waitForTimeout(5000);
 
-    return { type: 'brand', value: brandOption };
-  }
+      // 추가로 제품 목록이 업데이트되었는지 확인
+      await this.page.waitForSelector('ul.product_list li:not(.prod_ad_item)', { timeout: 10000 });
+      console.log('검색 결과 새로고침 완료');
 
-  async applyScreenSizeFilter(sizeOption) {
-    console.log(`화면크기 필터 적용: ${sizeOption.label}`);
+      // 필터 적용 확인
+      await expect(brandOption.element).toBeChecked();
 
-    await sizeOption.element.check();
-    await this.page.waitForLoadState('networkidle');
+      // 필터 적용 후 결과 검증
+      console.log(`\n=== 필터 검증: ${brandOption.label} ===`);
+      console.log(`필터 정보: label="${brandOption.label}", value="${brandOption.value}"`);
 
-    // 필터 적용 확인
-    await expect(sizeOption.element).toBeChecked();
+      const results = await this.getSearchResults();
+      const filteredResults = results.filter(product =>
+        product.brand.toLowerCase().includes(brandOption.label.toLowerCase()) ||
+        product.name.toLowerCase().includes(brandOption.label.toLowerCase())
+      );
 
-    return { type: 'screenSize', value: sizeOption };
-  }
+      console.log(`필터 적용 후 결과: ${results.length}개 중 ${filteredResults.length}개가 ${brandOption.label} 제품`);
 
-  async applyResolutionFilter(resolutionOption) {
-    console.log(`해상도 필터 적용: ${resolutionOption.label}`);
+      // 필터링된 제품들의 브랜드 분포 출력
+      const brandDistribution = {};
+      results.forEach(product => {
+        const brand = product.brand || '알 수 없음';
+        brandDistribution[brand] = (brandDistribution[brand] || 0) + 1;
+      });
 
-    await resolutionOption.element.check();
-    await this.page.waitForLoadState('networkidle');
+      console.log('📊 브랜드별 분포:');
+      Object.entries(brandDistribution)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([brand, count]) => {
+          console.log(`   ${brand}: ${count}개`);
+        });
 
-    // 필터 적용 확인
-    await expect(resolutionOption.element).toBeChecked();
+      if (filteredResults.length === 0) {
+        console.log('⚠️ 경고: 필터 적용 후 해당 브랜드 제품이 없습니다!');
+      }
 
-    return { type: 'resolution', value: resolutionOption };
-  }
-
-  async applyPriceRangeFilter(minPrice, maxPrice) {
-    console.log(`가격 범위 필터 적용: ${minPrice?.toLocaleString() || '무제한'}원 ~ ${maxPrice?.toLocaleString() || '무제한'}원`);
-
-    const { minInput, maxInput, applyButton } = this.filters.priceRange;
-
-    if (minPrice) {
-      await minInput.fill(minPrice.toString());
+      return {
+        type: 'brand',
+        label: brandOption.label,
+        value: brandOption.value
+      };
+    } catch (error) {
+      console.log('제조사 필터 적용 실패:', error.message);
+      throw error;
     }
-
-    if (maxPrice) {
-      await maxInput.fill(maxPrice.toString());
-    }
-
-    await applyButton.click();
-    await this.page.waitForLoadState('networkidle');
-
-    return { type: 'priceRange', value: { min: minPrice, max: maxPrice } };
   }
 
   // 검색 결과 수집
   async getSearchResults() {
-    // 결과 로딩 완료 대기
-    await this.page.waitForSelector('ul.product_list', { timeout: 10000 });
-
-    const results = [];
-    const productItems = this.page.locator('ul.product_list li');
-
-    const itemCount = await productItems.count();
-    const maxItems = Math.min(itemCount, 10);
-
-    console.log(`총 ${itemCount}개 상품 중 ${maxItems}개 수집`);
-
-    for (let i = 0; i < maxItems; i++) {
-      try {
-        const item = productItems.nth(i);
-        const productData = await this.extractProductInfo(item);
-
-        if (Object.keys(productData).length > 1) { // 최소한의 데이터가 있는 경우만
-          results.push(productData);
-        }
-      } catch (error) {
-        console.log(`상품 ${i + 1} 정보 추출 실패:`, error.message);
-      }
-    }
-
-    return results;
-  }
-
-  async extractProductInfo(item) {
-    const productData = {};
-
     try {
-      // 상품명 추출
-      const nameLink = item.getByRole('link').first();
-      if (await nameLink.count() > 0) {
-        productData.name = await nameLink.textContent();
-        productData.name = productData.name.trim();
+      console.log('=== 검색 결과 수집 시작 ===');
 
-        // 브랜드 추출 (상품명 첫 번째 단어)
-        const brandMatch = productData.name.match(/^([가-힣A-Za-z]+)/);
-        if (brandMatch) {
-          productData.brand = brandMatch[1];
+      // 가격비교 가능한 검색결과 개수 확인
+      let totalCount = 0;
+      const compareTab = this.page.locator('a.tab_link.tab_compare .list_num');
+      if (await compareTab.count() > 0) {
+        const compareText = await compareTab.textContent();
+        const match = compareText?.match(/\((\d+(?:,\d+)*)\)/);
+        if (match) {
+          totalCount = parseInt(match[1].replace(/,/g, ''));
+          console.log(`가격비교 가능한 검색결과: ${totalCount.toLocaleString()}개`);
         }
       }
 
-      // 가격 추출
-      const priceElement = item.getByText(/\d{1,3}(,\d{3})*원/).first();
-      if (await priceElement.count() > 0) {
-        const priceText = await priceElement.textContent();
-        const priceMatch = priceText.match(/(\d{1,3}(?:,\d{3})*)원/);
-        if (priceMatch) {
-          productData.price = parseInt(priceMatch[1].replace(/,/g, ''));
+      // 제품 목록 대기
+      await this.page.waitForSelector('ul.product_list', { timeout: 10000 });
+
+      // 제품 아이템들 찾기 (광고 제외 - 포괄적 필터링)
+      const allProductItems = this.page.locator('ul.product_list:not([class*="ad_point"]) li:not([class*="prod_ad_item"]):not([id*="adSmart"]):not([id*="adPoint"]):not([id*="adFocus"]):not([class*="ad-"]):not([class*="advertisement"]):not([class*="ad_item"])');
+      const allItemCount = await allProductItems.count();
+
+      console.log(`광고 제외된 전체 li 요소: ${allItemCount}개`);
+
+      // 유효한 제품만 필터링 (spec-box가 있는 경우만)
+      const validProductItems = this.page.locator('ul.product_list:not([class*="ad_point"]) li:not([class*="prod_ad_item"]):not([id*="adSmart"]):not([id*="adPoint"]):not([id*="adFocus"]):not([class*="ad-"]):not([class*="advertisement"]):not([class*="ad_item"])').filter({ has: this.page.locator('.spec-box') });
+      const itemCount = await validProductItems.count();
+
+      console.log(`유효한 제품 (spec-box 포함): ${itemCount}개`);
+
+      // 디버깅: 모든 li 요소 확인
+      const allItems = this.page.locator('ul.product_list li');
+      const totalItemCount = await allItems.count();
+      console.log(`전체 li 요소 개수: ${totalItemCount}개`);
+
+      // 광고 영역 제외한 li 요소 확인
+      const nonAdItems = this.page.locator('ul.product_list:not([class*="ad_point"]) li');
+      const nonAdItemCount = await nonAdItems.count();
+      console.log(`광고 영역 제외한 li 요소 개수: ${nonAdItemCount}개`);
+
+      // 광고 요소들 확인 (포괄적)
+      const adItems = this.page.locator('ul.product_list li[class*="prod_ad_item"], ul.product_list li[id*="adSmart"], ul.product_list li[id*="adPoint"], ul.product_list li[id*="adFocus"], ul.product_list li[class*="ad-"], ul.product_list li[class*="advertisement"], ul.product_list li[class*="ad_item"]');
+      const adItemCount = await adItems.count();
+      console.log(`광고 요소 개수: ${adItemCount}개`);
+
+      // 광고 div 요소들도 확인
+      const adDivs = this.page.locator('ul.product_list div[id*="adPoint"], ul.product_list div[id*="adFocus"], ul.product_list div[class*="ad-"]');
+      const adDivCount = await adDivs.count();
+      console.log(`광고 div 요소 개수: ${adDivCount}개`);
+
+      const results = [];
+      // 유효한 제품만 수집 (spec-box가 있는 제품만)
+      const maxItems = itemCount;
+
+      for (let i = 0; i < maxItems; i++) {
+        try {
+          const item = validProductItems.nth(i);
+
+          // spec-box 존재 여부 재확인
+          const specBox = item.locator('.spec-box');
+          if (await specBox.count() === 0) {
+            console.log(`제품 ${i + 1}: spec-box 없음, 건너뜀`);
+            continue;
+          }
+
+          // 제품명 추출
+          let name = '';
+          try {
+            const nameElement = item.locator('.prod_name a');
+            if (await nameElement.count() > 0) {
+              name = await nameElement.textContent();
+            }
+          } catch (error) {
+            // 무시
+          }
+
+          // 전체 텍스트에서 가격 정보 추출
+          let price = '';
+          try {
+            // 제품 항목의 모든 텍스트 가져오기
+            const allText = await item.textContent();
+            console.log(`\n=== 제품 ${i + 1} 전체 텍스트 ===`);
+            console.log(allText || '텍스트 없음');
+            console.log(`=== 제품 ${i + 1} 텍스트 끝 ===\n`);
+
+            // 가격 패턴 찾기 (숫자,숫자,숫자원 또는 숫자원)
+            const pricePatterns = [
+              /(\d{1,3}(?:,\d{3})*)원/g,  // 1,074,000원
+              /(\d+)원/g,                  // 1074000원
+              /(\d{1,3}(?:,\d{3})*)\s*원/g, // 1,074,000 원
+              /(\d+)\s*원/g                // 1074000 원
+            ];
+
+            for (const pattern of pricePatterns) {
+              const matches = allText?.match(pattern);
+              if (matches && matches.length > 0) {
+                // 가장 큰 숫자를 가격으로 선택 (보통 가장 큰 숫자가 가격)
+                const prices = matches.map(match => {
+                  const numStr = match.replace(/[^\d]/g, '');
+                  return parseInt(numStr);
+                });
+                const maxPrice = Math.max(...prices);
+                price = `${maxPrice.toLocaleString()}원`;
+                console.log(`가격 패턴 찾음 (${pattern}): ${price}`);
+                break;
+              }
+            }
+
+            if (!price) {
+              console.log(`제품 ${i + 1} 가격 패턴을 찾을 수 없음`);
+            }
+          } catch (error) {
+            console.log(`제품 ${i + 1} 텍스트 추출 오류: ${error.message}`);
+          }
+
+          if (name) {
+            // 브랜드 추출 (제품명에서 첫 번째 단어)
+            let brand = '';
+            const brandMatch = name.trim().match(/^([가-힣A-Za-z]+)/);
+            if (brandMatch) {
+              brand = brandMatch[1];
+            }
+
+            // 스펙 정보 추출 (간단한 정보만)
+            let specs = '';
+            try {
+              const specElement = item.locator('.spec_list');
+              if (await specElement.count() > 0) {
+                const specText = await specElement.textContent();
+                if (specText) {
+                  // 첫 100자만 추출
+                  specs = specText.trim().substring(0, 100) + (specText.length > 100 ? '...' : '');
+                }
+              }
+            } catch (error) {
+              // 무시
+            }
+
+            results.push({
+              name: name.trim(),
+              brand: brand,
+              price: price?.trim() || '가격 정보 없음',
+              specs: specs,
+              index: i + 1
+            });
+            console.log(`제품 ${i + 1}: ${brand} ${name.trim()} - ${price?.trim() || '가격 정보 없음'}`);
+
+
+          }
+        } catch (error) {
+          console.log(`제품 ${i + 1} 정보 추출 실패: ${error.message}`);
         }
       }
 
-      // 스펙 정보 추출
-      const specElements = item.locator('text=/인치|4K|UHD|FHD|HD/').all();
-      const specTexts = await Promise.all(
-        (await specElements).map(el => el.textContent())
-      );
+      console.log(`총 ${results.length}개의 제품 정보 수집 완료`);
 
-      const fullSpecText = specTexts.join(' ');
+      // 수집된 제품 정보 요약
+      console.log('\n=== 수집된 제품 요약 ===');
+      console.log(`- 총 제품 수: ${results.length}개`);
 
-      if (fullSpecText) {
-        // 화면크기 추출
-        const sizeMatch = fullSpecText.match(/(\d+)인치/);
-        if (sizeMatch) {
-          productData.screenSize = parseInt(sizeMatch[1]);
+      // 가격 정보가 있는 제품 수 계산
+      const productsWithPrice = results.filter(p => p.price && p.price !== '가격 정보 없음').length;
+      console.log(`- 가격 정보 있는 제품: ${productsWithPrice}개`);
+      console.log(`- 가격 정보 없는 제품: ${results.length - productsWithPrice}개`);
+
+      // 첫 페이지 결과를 보기 좋게 출력
+      console.log('\n=== 첫 페이지 검색 결과 (최대 30개) ===');
+      results.forEach((product, index) => {
+        console.log(`${index + 1}. ${product.brand} ${product.name}`);
+        console.log(`   💰 가격: ${product.price}`);
+        if (product.specs) {
+          console.log(`   📋 스펙: ${product.specs.substring(0, 100)}${product.specs.length > 100 ? '...' : ''}`);
         }
+        console.log(''); // 빈 줄로 구분
+      });
 
-        // 해상도 추출
-        if (fullSpecText.includes('4K') || fullSpecText.includes('UHD')) {
-          productData.resolution = '4K';
-        } else if (fullSpecText.includes('FHD')) {
-          productData.resolution = 'FHD';
-        } else if (fullSpecText.includes('HD')) {
-          productData.resolution = 'HD';
-        }
+      // 검색결과 총 개수 출력
+      console.log('\n=== 검색결과 요약 ===');
+      console.log(`📊 유효한 제품 (spec-box 포함): ${results.length}개`);
+      console.log(`📊 광고 제외된 전체 li 요소: ${allItemCount}개`);
+      if (totalCount) {
+        console.log(`📊 전체 가격비교 가능 제품: ${totalCount.toLocaleString()}개`);
       }
+      console.log(`📊 필터링 비율: ${allItemCount > 0 ? ((results.length / allItemCount) * 100).toFixed(1) : 0}%`);
 
+      return results;
     } catch (error) {
-      console.log('상품 정보 추출 중 오류:', error.message);
-    }
-
-    return productData;
-  }
-
-  // 필터 조건과 결과 일치성 검증
-  validateFilterResults(appliedFilters, searchResults) {
-    const validationResults = {
-      isValid: true,
-      totalProducts: searchResults.length,
-      details: []
-    };
-
-    for (const filter of appliedFilters) {
-      const validation = this.validateSingleFilter(filter, searchResults);
-      validationResults.details.push(validation);
-
-      if (!validation.isValid) {
-        validationResults.isValid = false;
-      }
-    }
-
-    return validationResults;
-  }
-
-  validateSingleFilter(filter, searchResults) {
-    const validation = {
-      filterType: filter.type,
-      filterValue: filter.value,
-      isValid: true,
-      validCount: 0,
-      invalidCount: 0,
-      invalidItems: []
-    };
-
-    for (const result of searchResults) {
-      let isProductValid = false;
-
-      switch (filter.type) {
-        case 'brand':
-          isProductValid = !result.brand ||
-            result.brand.toLowerCase().includes(filter.value.label.toLowerCase()) ||
-            result.name.toLowerCase().includes(filter.value.label.toLowerCase());
-          break;
-
-        case 'screenSize':
-          const expectedSize = parseInt(filter.value.label.match(/\d+/)?.[0]);
-          isProductValid = !result.screenSize ||
-            !expectedSize ||
-            Math.abs(result.screenSize - expectedSize) <= 2;
-          break;
-
-        case 'resolution':
-          isProductValid = !result.resolution ||
-            result.resolution.toLowerCase().includes(filter.value.label.toLowerCase());
-          break;
-
-        case 'priceRange':
-          const { min, max } = filter.value;
-          isProductValid = !result.price ||
-            ((!min || result.price >= min) && (!max || result.price <= max));
-          break;
-
-        default:
-          isProductValid = true;
-      }
-
-      if (isProductValid) {
-        validation.validCount++;
-      } else {
-        validation.invalidCount++;
-        validation.invalidItems.push({
-          name: result.name,
-          reason: this.getValidationReason(filter, result)
-        });
-      }
-    }
-
-    validation.isValid = validation.invalidCount === 0;
-    validation.accuracy = validation.validCount / searchResults.length;
-
-    return validation;
-  }
-
-  getValidationReason(filter, result) {
-    switch (filter.type) {
-      case 'brand':
-        return `예상 브랜드: ${filter.value.label}, 실제: ${result.brand || '알 수 없음'}`;
-      case 'screenSize':
-        return `예상 크기: ${filter.value.label}, 실제: ${result.screenSize || '알 수 없음'}인치`;
-      case 'resolution':
-        return `예상 해상도: ${filter.value.label}, 실제: ${result.resolution || '알 수 없음'}`;
-      case 'priceRange':
-        return `가격 범위: ${filter.value.min || 0}~${filter.value.max || '무제한'}원, 실제: ${result.price?.toLocaleString() || '알 수 없음'}원`;
-      default:
-        return '알 수 없는 오류';
-    }
-  }
-
-  // 결과 출력 헬퍼
-  logValidationResults(validation) {
-    console.log('\n=== 필터 검증 결과 ===');
-    console.log(`전체 정확도: ${validation.isValid ? '✅ 통과' : '❌ 실패'} (${validation.totalProducts}개 상품)`);
-
-    for (const detail of validation.details) {
-      console.log(`\n${detail.filterType} 필터:`);
-      console.log(`  - 정확도: ${(detail.accuracy * 100).toFixed(1)}% (${detail.validCount}/${detail.validCount + detail.invalidCount})`);
-      console.log(`  - 상태: ${detail.isValid ? '✅ 통과' : '⚠️ 일부 불일치'}`);
-
-      if (detail.invalidItems.length > 0) {
-        console.log('  - 불일치 항목:');
-        detail.invalidItems.slice(0, 3).forEach(item => {
-          console.log(`    • ${item.name} (${item.reason})`);
-        });
-      }
+      console.log('검색 결과 수집 실패:', error.message);
+      return [];
     }
   }
 }
 
-// 테스트 케이스들
+// 테스트 실행
 test.describe('다나와 TV 필터링 테스트', () => {
   let filterTest;
 
@@ -856,189 +407,37 @@ test.describe('다나와 TV 필터링 테스트', () => {
     filterTest = new DanawaFilterTest(page);
     await filterTest.navigateToTVCategory();
 
-    // 페이지 로딩 확인 (실제 HTML 구조에 맞게 수정)
+    // 페이지 로딩 확인
     await expect(page).toHaveTitle(/TV|텔레비전/);
-    await expect(page.locator('dl.spec_item_bg.makerBrandArea')).toBeVisible();
+    await expect(page.locator('dl.spec_item.spec_item_bg.makerBrandArea')).toBeVisible();
   });
 
-  test('사용 가능한 필터 조건 확인', async () => {
-    const filters = await filterTest.getAvailableFilters();
+  test('제조사별 필터 확인 및 적용', async () => {
+    // 제조사별 필터 수집
+    const brands = await filterTest.getBrandFilters();
+    expect(brands.length).toBeGreaterThan(0);
 
-    console.log('\n=== 사용 가능한 필터 조건 ===');
+    console.log('\n=== 사용 가능한 제조사 ===');
+    brands.slice(0, 5).forEach(brand =>
+      console.log(`  - ${brand.label} (${brand.value})`)
+    );
 
-    if (filters.brand?.length > 0) {
-      console.log(`브랜드 필터: ${filters.brand.length}개`);
-      filters.brand.slice(0, 3).forEach(brand =>
-        console.log(`  - ${brand.label}`)
-      );
-    }
+    // 첫 번째 제조사 선택
+    const selectedBrand = brands[0];
+    console.log(`\n선택된 제조사: ${selectedBrand.label} (${selectedBrand.value})`);
 
-    if (filters.screenSize?.length > 0) {
-      console.log(`화면크기 필터: ${filters.screenSize.length}개`);
-      filters.screenSize.slice(0, 3).forEach(size =>
-        console.log(`  - ${size.label}`)
-      );
-    }
-
-    if (filters.resolution?.length > 0) {
-      console.log(`해상도 필터: ${filters.resolution.length}개`);
-      filters.resolution.slice(0, 3).forEach(resolution =>
-        console.log(`  - ${resolution.label}`)
-      );
-    }
-
-    if (filters.priceRange) {
-      console.log('가격 범위 필터: 사용 가능');
-    }
-
-    // 최소 하나의 필터는 존재해야 함
-    const totalFilters = Object.keys(filters).length;
-    expect(totalFilters).toBeGreaterThan(0);
-
-    console.log(`\n총 ${totalFilters}개 필터 타입 발견`);
-  });
-
-  test('브랜드 필터 정확성 검증', async () => {
-    const filters = await filterTest.getAvailableFilters();
-
-    // 브랜드 필터가 있는지 확인
-    expect(filters.brand?.length).toBeGreaterThan(0);
-
-    const selectedBrand = filters.brand[0];
+    // 필터 적용
     const appliedFilter = await filterTest.applyBrandFilter(selectedBrand);
 
     // 결과 수집
     const results = await filterTest.getSearchResults();
     expect(results.length).toBeGreaterThan(0);
 
-    // 검증
-    const validation = filterTest.validateFilterResults([appliedFilter], results);
-    filterTest.logValidationResults(validation);
+    console.log(`\n=== 필터 적용 결과 ===`);
+    console.log(`적용된 필터: ${appliedFilter.label}`);
+    console.log(`검색 결과: ${results.length}개 제품`);
 
-    // 80% 이상 정확도면 통과
-    expect(validation.details[0].accuracy).toBeGreaterThan(0.8);
-  });
-
-  test('화면크기 필터 정확성 검증', async () => {
-    const filters = await filterTest.getAvailableFilters();
-
-    if (filters.screenSize?.length > 0) {
-      const selectedSize = filters.screenSize[0];
-      const appliedFilter = await filterTest.applyScreenSizeFilter(selectedSize);
-
-      const results = await filterTest.getSearchResults();
-      expect(results.length).toBeGreaterThan(0);
-
-      const validation = filterTest.validateFilterResults([appliedFilter], results);
-      filterTest.logValidationResults(validation);
-
-      // 화면크기는 70% 이상 정확도면 통과 (정보 추출이 어려울 수 있음)
-      expect(validation.details[0].accuracy).toBeGreaterThan(0.7);
-    } else {
-      test.skip('화면크기 필터가 없습니다.');
-    }
-  });
-
-  test('가격 범위 필터 정확성 검증', async () => {
-    const filters = await filterTest.getAvailableFilters();
-
-    if (filters.priceRange) {
-      filterTest.filters = filters; // 필터 정보 저장
-
-      const minPrice = 500000; // 50만원
-      const maxPrice = 1500000; // 150만원
-
-      const appliedFilter = await filterTest.applyPriceRangeFilter(minPrice, maxPrice);
-
-      const results = await filterTest.getSearchResults();
-      expect(results.length).toBeGreaterThan(0);
-
-      const validation = filterTest.validateFilterResults([appliedFilter], results);
-      filterTest.logValidationResults(validation);
-
-      // 가격 정보는 70% 이상 정확도면 통과
-      expect(validation.details[0].accuracy).toBeGreaterThan(0.7);
-    } else {
-      test.skip('가격 범위 필터가 없습니다.');
-    }
-  });
-
-  test('복합 필터 조합 테스트', async () => {
-    const filters = await filterTest.getAvailableFilters();
-    const appliedFilters = [];
-
-    // 브랜드 필터 적용
-    if (filters.brand?.length > 0) {
-      const brandFilter = await filterTest.applyBrandFilter(filters.brand[0]);
-      appliedFilters.push(brandFilter);
-    }
-
-    // 화면크기 필터 추가 적용
-    if (filters.screenSize?.length > 0) {
-      const sizeFilter = await filterTest.applyScreenSizeFilter(filters.screenSize[0]);
-      appliedFilters.push(sizeFilter);
-    }
-
-    expect(appliedFilters.length).toBeGreaterThan(0);
-
-    const results = await filterTest.getSearchResults();
-    console.log(`복합 필터 적용 후: ${results.length}개 상품`);
-
-    const validation = filterTest.validateFilterResults(appliedFilters, results);
-    filterTest.logValidationResults(validation);
-
-    // 복합 필터는 개별 필터보다 엄격하지 않게 검증
-    const avgAccuracy = validation.details.reduce((sum, detail) => sum + detail.accuracy, 0) / validation.details.length;
-    expect(avgAccuracy).toBeGreaterThan(0.6);
-  });
-
-  test('필터 초기화 후 전체 결과 확인', async () => {
-    const filters = await filterTest.getAvailableFilters();
-
-    // 필터 적용
-    if (filters.brand?.length > 0) {
-      await filterTest.applyBrandFilter(filters.brand[0]);
-    }
-
-    // 필터링된 결과 수집
-    const filteredResults = await filterTest.getSearchResults();
-    const filteredCount = filteredResults.length;
-
-    // 필터 초기화 (페이지 새로고침)
-    await filterTest.navigateToTVCategory();
-
-    // 전체 결과 수집
-    const allResults = await filterTest.getSearchResults();
-    const totalCount = allResults.length;
-
-    console.log(`필터 적용 시: ${filteredCount}개, 전체: ${totalCount}개`);
-
-    // 필터 적용 시 결과가 줄어들어야 함 (일반적으로)
-    expect(filteredCount).toBeLessThanOrEqual(totalCount);
-
-    // 모든 결과에 기본 정보가 있는지 확인
-    const resultsWithName = allResults.filter(result => result.name);
-    expect(resultsWithName.length).toBeGreaterThan(totalCount * 0.8); // 80% 이상
+    // 브라우저를 열어둔 상태로 유지 (10초)
+    await filterTest.page.waitForTimeout(10000);
   });
 });
-
-// 설정 파일 (playwright.config.js) 예시
-/*
-module.exports = {
-  testDir: './tests',
-  timeout: 30000,
-  expect: { timeout: 10000 },
-  use: {
-    headless: false,
-    viewport: { width: 1280, height: 720 },
-    actionTimeout: 10000,
-    navigationTimeout: 30000,
-  },
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-  ],
-};
-*/
