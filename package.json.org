@@ -8,7 +8,6 @@
     "url": "git+https://github.com/microsoft/playwright.git"
   },
   "homepage": "https://playwright.dev",
-  "type": "module",
   "engines": {
     "node": ">=18"
   },
@@ -58,6 +57,8 @@
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.19.0",
     "@octokit/graphql-schema": "^15.26.0",
+    "@playwright/experimental-ct-core": "^1.55.0-next",
+    "@playwright/experimental-ct-react": "^1.55.0-next",
     "@playwright/test": "^1.55.0-next",
     "@stylistic/eslint-plugin": "^3.0.1",
     "@types/codemirror": "^5.60.7",

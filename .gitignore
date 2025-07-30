@@ -1,4 +1,5 @@
 node_modules/
+**/node_modules/
 /test-results/
 /tests/coverage-report
 .local-browsers/
@@ -36,3 +37,5 @@ test-results
 .eslintcache
 playwright.env
 /firefox/
+
+.history/
