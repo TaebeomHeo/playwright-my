@@ -39,3 +39,8 @@ playwright.env
 /firefox/
 
 .history/
+
+# Playwright
+/playwright-report/
+/blob-report/
+/playwright/.cache/

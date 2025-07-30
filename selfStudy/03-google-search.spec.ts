@@ -1,31 +1,35 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
-test('Google 검색 자동화', async ({ page }) => {
-    // 1. 구글 홈페이지 접속
-    await page.goto('https://www.google.com/');
+test('다나와 노트북 검색 및 상품 상세', async ({ page }) => {
+  // 1. 다나와 접속
+  await page.goto('https://danawa.com/');
 
-    // 2. 검색창 찾기 (실제 구글의 선택자에 맞게 수정)
-    const searchInput = page.locator('input[name="q"]').first();
-    await searchInput.waitFor({ state: 'visible' });
-    await searchInput.fill('Playwright 자습서');
-    await searchInput.press('Enter');
+  // 2. 검색창 클릭 및 검색어 입력
+  await page.getByRole('textbox', { name: '검색어 입력' }).click();
+  await page.getByRole('textbox', { name: '검색어 입력' }).fill('노트북');
+  await page.getByRole('textbox', { name: '검색어 입력' }).press('Enter');
 
-    // 3. 검색 결과 로딩 대기
-    await page.waitForLoadState('networkidle');
+  // 3. 검색 결과 로딩 대기
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000); // 추가 대기 시간
 
-    // 4. 첫 번째 검색 결과 클릭
-    const firstResult = page.locator('a[href*="playwright"]').first();
-    await firstResult.waitFor({ state: 'visible' });
-    await firstResult.click();
+  // 4. 검색 결과가 나타날 때까지 대기
+  await page.waitForSelector('ul.product_list li.prod_item', { timeout: 10000 });
 
-    // 5. 페이지 로딩 대기
-    await page.waitForLoadState('networkidle');
+  // 5. 검색 버튼 클릭 (필요한 경우)
+  await page.getByRole('button', { name: '검색', exact: true }).click();
 
-    // 6. 페이지 제목 확인
-    await expect(page).toHaveTitle(/Playwright/);
+  // 6. 팝업 대기 및 상품 클릭
+  const page1Promise = page.waitForEvent('popup');
+  await page.getByRole('link', { name: '삼성전자 갤럭시북4 NT750XGR-A51A WIN11', exact: true }).click();
+  const page1 = await page1Promise;
 
-    // 7. 스크린샷 저장
-    await page.screenshot({ path: 'google-search-result.png' });
+  // 7. 두 번째 팝업 대기 및 상품 상세 클릭
+  const page2Promise = page1.waitForEvent('popup');
+  await page1.getByRole('listitem').filter({ hasText: '최저가 797,900 원 무료배송' }).getByLabel('상품보기').click();
+  const page2 = await page2Promise;
 
-    console.log('구글 검색 완료!');
-}); 
+  // 8. 팝업 처리
+  await page2.locator('#popupCheck').check();
+  await page2.getByRole('link', { name: '[닫기]' }).click();
+});
